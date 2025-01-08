@@ -10,36 +10,23 @@ openai.api_key = os.environ.get('OPENAI_API_KEY')
 def create_outline(text):
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-4o",
+            model="gpt-4",
             messages=[
                 {"role": "system", "content": """You will be given an article. Transform that into an outline, with each section broken down into its key facts and key points. Do not add your insights or rephrases the lines. Create outlines following this exact sample format for a section of a given article:
 
 Input text:
-
 It's Dangerous
-
 The narrow, razor-thin paths with thousand-foot drop-offs on both sides aren't just challenging—they're potentially fatal. Hikers must navigate chains bolted into solid rock, with nothing between you and a catastrophic fall except your own grip strength and mental fortitude. The trail is so treacherous that the National Park Service has installed warning signs that say: "Since 2004, six people have died falling from cliffs on this route." As of 2024, there have been 18 confirmed deaths in and near Angel's Landing, not to mention the countless injuries sustained by hikers. That's why before you go, you need to be realistic about how dangerous Angel's Landing can be and whether you can handle it.
 
 Output format:
-
 It's Dangerous
-
 -- Narrow razor-thin paths
 -- Thousand-foot drop-offs
 -- Requires clinging to chains bolted into rocks
 -- No barriers
 -- National Park Service warning sign says "Since 2004, six people have died falling from cliffs on this route."
 -- 18 confirmed deaths near Angel's Landing by 2024
--- Numerous injuries
-
-Rules:
-1. Extract only factual points from the text
-2. Use exact words from the text where possible
-3. Keep points concise
-4. Start each point with '--'
-5. Use 'SUBHEADING:' for headers
-6. Don't add interpretations or insights
-7. Don't add information not present in the text"""},
+-- Numerous injuries"""},
                 {"role": "user", "content": f"Create an outline from this text following the exact format shown:\n\n{text}"}
             ],
             temperature=0.1
@@ -66,13 +53,13 @@ def generate_outlines():
             
         try:
             content = file.read().decode('utf-8')
-            outline = create_outline(content)
+            outline_text = create_outline(content)
             
             title = os.path.splitext(file.filename)[0]
             results.append({
                 'filename': file.filename,
                 'title': title,
-                'outline': outline
+                'outline_text': outline_text
             })
                 
         except Exception as e:

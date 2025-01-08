@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Multi-Article Outliner</title>
+    <style>
+        body {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        .input-section {
+            margin-bottom: 30px;
+        }
+        .url-input {
+            display: flex;
+            margin-bottom: 10px;
+            gap: 10px;
+        }
+        input[type="text"] {
+            flex-grow: 1;
+            padding: 8px;
+        }
+        .buttons {
+            margin: 20px 0;
+        }
+        .article-outline {
+            margin-bottom: 40px;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .outline-section {
+            margin-bottom: 25px;
+        }
+        .outline-header {
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+        .outline-points {
+            margin-left: 20px;
+        }
+        .outline-point {
+            margin-bottom: 5px;
+        }
+        .article-url {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>Multi-Article Outliner</h1>
+    <div class="input-section">
+        <div id="urlInputs">
+            <div class="url-input">
+                <input type="text" class="url-field" placeholder="Enter article URL">
+                <button onclick="removeUrlField(this)">Remove</button>
+            </div>
+        </div>
+        <div class="buttons">
+            <button onclick="addUrlField()">Add Another URL</button>
+            <button onclick="generateOutlines()">Generate Outlines</button>
+        </div>
+    </div>
+    <div id="result"></div>
+
+    <script>
+        function addUrlField() {
+            const urlInputs = document.getElementById('urlInputs');
+            const newInput = document.createElement('div');
+            newInput.className = 'url-input';
+            newInput.innerHTML = `
+                <input type="text" class="url-field" placeholder="Enter article URL">
+                <button onclick="removeUrlField(this)">Remove</button>
+            `;
+            urlInputs.appendChild(newInput);
+        }
+
+        function removeUrlField(button) {
+            const urlInputs = document.getElementById('urlInputs');
+            if (urlInputs.children.length > 1) {
+                button.parentElement.remove();
+            }
+        }
+
+        async function downloadOutline(title, outline) {
+            let content = `${title}\n\n`;
+            
+            outline.forEach(section => {
+                content += `${section.header}\n`;
+                section.points.forEach(point => {
+                    content += `• ${point}\n`;
+                });
+                content += '\n';
+            });
+            
+            try {
+                const response = await fetch('/download-outline', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        title: title,
+                        content: content
+                    })
+                });
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${title}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+            } catch (error) {
+                console.error('Download failed:', error);
+            }
+        }
+
+        async function generateOutlines() {
+            const urlFields = document.getElementsByClassName('url-field');
+            const urls = Array.from(urlFields).map(field => field.value).filter(url => url);
+            const result = document.getElementById('result');
+            
+            try {
+                const response = await fetch('/generate-outlines', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ urls })
+                });
+                
+                const data = await response.json();
+                
+                // Auto-download outlines
+                data.forEach(article => {
+                    if (!article.error) {
+                        downloadOutline(article.title, article.outline);
+                    }
+                });
+
+                // Display outlines on page
+                let html = '';
+                data.forEach(article => {
+                    html += `<div class="article-outline">`;
+                    
+                    if (article.error) {
+                        html += `
+                            <div class="article-url">${article.url}</div>
+                            <div class="error">Error: ${article.error}</div>
+                        `;
+                    } else {
+                        html += `
+                            <h2>${article.title}</h2>
+                            <div class="article-url">${article.url}</div>
+                        `;
+                        
+                        article.outline.forEach(section => {
+                            html += `
+                                <div class="outline-section">
+                                    <div class="outline-header">${section.header}</div>
+                                    <div class="outline-points">
+                                        ${section.points.map(point => 
+                                            `<div class="outline-point">• ${point}</div>`
+                                        ).join('')}
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+                    
+                    html += `</div>`;
+                });
+                
+                result.innerHTML = html;
+            } catch (error) {
+                result.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

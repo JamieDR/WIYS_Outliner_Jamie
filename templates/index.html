@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Text File to Outline Converter</title>
+    <title>Text File to Outline</title>
     <style>
         body {
             max-width: 1000px;
@@ -12,9 +12,10 @@
         }
         .input-section {
             margin-bottom: 30px;
-        }
-        .file-input {
-            margin-bottom: 20px;
+            padding: 20px;
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            text-align: center;
         }
         .buttons {
             margin: 20px 0;
@@ -45,7 +46,7 @@
     </style>
 </head>
 <body>
-    <h1>Text File to Outline Converter</h1>
+    <h1>Text File to Outline</h1>
     <div class="input-section">
         <input type="file" id="fileInput" multiple accept=".txt">
         <div class="buttons">
@@ -60,12 +61,16 @@
             const result = document.getElementById('result');
             
             if (fileInput.files.length === 0) {
-                result.innerHTML = '<p class="error">Please select at least one file</p>';
+                result.innerHTML = '<p class="error">Please select at least one .txt file</p>';
                 return;
             }
             
             const formData = new FormData();
             for (let file of fileInput.files) {
+                if (!file.name.endsWith('.txt')) {
+                    result.innerHTML = '<p class="error">Please select only .txt files</p>';
+                    return;
+                }
                 formData.append('files[]', file);
             }
             

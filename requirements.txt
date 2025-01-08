@@ -3,3 +3,4 @@ werkzeug==2.2.3
 newspaper3k==0.2.8
 spacy==3.7.2
 gunicorn==20.1.0
+lxml[html_clean]>=4.9.3

@@ -1,15 +1,15 @@
 # app.py
 from flask import Flask, request, render_template, jsonify, send_file
-import openai
+from openai import OpenAI
 import os
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-openai.api_key = os.environ.get('OPENAI_API_KEY')
+client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
 
 def create_outline(text):
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": """You will be given an article. Transform that into an outline, with each section broken down into its key facts and key points. Do not add your insights or rephrases the lines. Create outlines following this exact sample format for a section of a given article:
@@ -31,7 +31,7 @@ It's Dangerous
             ],
             temperature=0.1
         )
-        return response.choices[0].message['content']
+        return response.choices[0].message.content
     except Exception as e:
         return str(e)
 

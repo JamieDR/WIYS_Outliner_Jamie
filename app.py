@@ -16,6 +16,14 @@ except:
     nlp = spacy.load("en_core_web_sm")
 
 def create_outline(text):
+    # Clean the text
+    text = re.sub(r'Advertisement|Sponsored Content|Share this article|Follow us|Subscribe|Sign up', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'(Follow|Like|Share|Tweet|Pin).+(Facebook|Twitter|Instagram|LinkedIn|Pinterest)', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'Sign up for our newsletter|Get our daily newsletter|Enter your email', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'Menu|Navigation|Home|About|Contact|Search', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'Copyright|All rights reserved|Terms of (Use|Service)|Privacy Policy', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'By\s+[\w\s]+\s*\|.*?\d{4}', '', text, flags=re.IGNORECASE)  # Remove bylines
+    
     paragraphs = text.split('\n')
     outline = []
     
@@ -24,11 +32,14 @@ def create_outline(text):
     
     for para in paragraphs:
         para = para.strip()
-        if not para:
+        if not para or len(para) < 10:
             continue
             
-        if len(para.split()) <= 5 and len(para) < 50:
-            if current_section:
+        if re.search(r'By\s+|Published\s+|Updated\s+|Posted\s+', para, re.IGNORECASE):
+            continue
+            
+        if len(para.split()) <= 5 and len(para) < 50 and not re.search(r'click here|subscribe|sign up|limited time|special offer', para, flags=re.IGNORECASE):
+            if current_section and current_points:
                 outline.append({
                     "header": current_section,
                     "points": current_points
@@ -39,16 +50,24 @@ def create_outline(text):
             doc = nlp(para)
             for sent in doc.sents:
                 point = sent.text.strip()
+                
+                if re.search(r'click here|subscribe|sign up|limited time|special offer', point, flags=re.IGNORECASE):
+                    continue
+                    
                 point = re.sub(r'^(There are|There is|It is|This is)\s+', '', point)
                 point = point.rstrip('.')
-                current_points.append(point)
+                
+                if len(point.split()) > 3:
+                    current_points.append(point)
     
-    if current_section:
+    if current_section and current_points:
         outline.append({
             "header": current_section,
             "points": current_points
         })
     
+    # Remove any empty sections
+    outline = [section for section in outline if section['points']]
     return outline
 
 @app.route('/')
@@ -66,12 +85,21 @@ def generate_outlines():
             article.download()
             article.parse()
             
-            outline = create_outline(article.text)
-            results.append({
-                'url': url,
-                'title': article.title,
-                'outline': outline
-            })
+            main_text = article.text
+            outline = create_outline(main_text)
+            
+            if outline:  # Only include if we got actual content
+                results.append({
+                    'url': url,
+                    'title': article.title,
+                    'outline': outline
+                })
+            else:
+                results.append({
+                    'url': url,
+                    'error': 'Could not extract meaningful content from this URL'
+                })
+                
         except Exception as e:
             results.append({
                 'url': url,

@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Text File to Outline</title>
+    <title>Article to Outline Converter</title>
     <style>
         body {
             max-width: 1000px;
@@ -43,10 +43,25 @@
         .error {
             color: red;
         }
+        pre {
+            white-space: pre-wrap;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .instructions {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
-    <h1>Text File to Outline</h1>
+    <h1>Article to Outline Converter</h1>
+    <div class="instructions">
+        <p>Upload .txt files containing article text to generate structured outlines.</p>
+    </div>
     <div class="input-section">
         <input type="file" id="fileInput" multiple accept=".txt">
         <div class="buttons">
@@ -85,7 +100,7 @@
                 // Auto-download outlines
                 data.forEach(article => {
                     if (!article.error) {
-                        downloadOutline(article.title, article.outline);
+                        downloadOutline(article.title, article.outline_text);
                     }
                 });
 
@@ -102,20 +117,8 @@
                     } else {
                         html += `
                             <h2>${article.title}</h2>
+                            <pre>${article.outline_text}</pre>
                         `;
-                        
-                        article.outline.forEach(section => {
-                            html += `
-                                <div class="outline-section">
-                                    <div class="outline-header">${section.header}</div>
-                                    <div class="outline-points">
-                                        ${section.points.map(point => 
-                                            `<div class="outline-point">• ${point}</div>`
-                                        ).join('')}
-                                    </div>
-                                </div>
-                            `;
-                        });
                     }
                     
                     html += `</div>`;
@@ -127,17 +130,7 @@
             }
         }
 
-        async function downloadOutline(title, outline) {
-            let content = `${title}\n\n`;
-            
-            outline.forEach(section => {
-                content += `${section.header}\n`;
-                section.points.forEach(point => {
-                    content += `• ${point}\n`;
-                });
-                content += '\n';
-            });
-            
+        async function downloadOutline(title, outlineText) {
             try {
                 const response = await fetch('/download-outline', {
                     method: 'POST',
@@ -146,7 +139,7 @@
                     },
                     body: JSON.stringify({
                         title: title,
-                        content: content
+                        content: outlineText
                     })
                 });
                 

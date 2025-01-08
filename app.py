@@ -1,11 +1,17 @@
+# app.py
 from flask import Flask, request, render_template, jsonify, send_file
-from newspaper import Article
 import spacy
 import re
 import os
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['UPLOAD_FOLDER'] = 'uploads'
+
+# Create uploads folder if it doesn't exist
+if not os.path.exists(app.config['UPLOAD_FOLDER']):
+    os.makedirs(app.config['UPLOAD_FOLDER'])
 
 # Load spacy model at startup
 try:
@@ -22,7 +28,6 @@ def create_outline(text):
     text = re.sub(r'Sign up for our newsletter|Get our daily newsletter|Enter your email', '', text, flags=re.IGNORECASE)
     text = re.sub(r'Menu|Navigation|Home|About|Contact|Search', '', text, flags=re.IGNORECASE)
     text = re.sub(r'Copyright|All rights reserved|Terms of (Use|Service)|Privacy Policy', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'By\s+[\w\s]+\s*\|.*?\d{4}', '', text, flags=re.IGNORECASE)  # Remove bylines
     
     paragraphs = text.split('\n')
     outline = []
@@ -35,10 +40,7 @@ def create_outline(text):
         if not para or len(para) < 10:
             continue
             
-        if re.search(r'By\s+|Published\s+|Updated\s+|Posted\s+', para, re.IGNORECASE):
-            continue
-            
-        if len(para.split()) <= 5 and len(para) < 50 and not re.search(r'click here|subscribe|sign up|limited time|special offer', para, flags=re.IGNORECASE):
+        if len(para.split()) <= 5 and len(para) < 50:
             if current_section and current_points:
                 outline.append({
                     "header": current_section,
@@ -50,10 +52,6 @@ def create_outline(text):
             doc = nlp(para)
             for sent in doc.sents:
                 point = sent.text.strip()
-                
-                if re.search(r'click here|subscribe|sign up|limited time|special offer', point, flags=re.IGNORECASE):
-                    continue
-                    
                 point = re.sub(r'^(There are|There is|It is|This is)\s+', '', point)
                 point = point.rstrip('.')
                 
@@ -76,33 +74,41 @@ def home():
 
 @app.route('/generate-outlines', methods=['POST'])
 def generate_outlines():
-    urls = request.json.get('urls', [])
     results = []
     
-    for url in urls:
+    if 'files[]' not in request.files:
+        return jsonify({'error': 'No files uploaded'}), 400
+        
+    files = request.files.getlist('files[]')
+    
+    for file in files:
+        if file.filename == '':
+            continue
+            
         try:
-            article = Article(url)
-            article.download()
-            article.parse()
+            # Read and decode the file content
+            content = file.read().decode('utf-8')
             
-            main_text = article.text
-            outline = create_outline(main_text)
+            # Create outline from file content
+            outline = create_outline(content)
             
-            if outline:  # Only include if we got actual content
+            if outline:
+                # Use filename without extension as title
+                title = os.path.splitext(file.filename)[0]
                 results.append({
-                    'url': url,
-                    'title': article.title,
+                    'filename': file.filename,
+                    'title': title,
                     'outline': outline
                 })
             else:
                 results.append({
-                    'url': url,
-                    'error': 'Could not extract meaningful content from this URL'
+                    'filename': file.filename,
+                    'error': 'Could not extract meaningful content from this file'
                 })
                 
         except Exception as e:
             results.append({
-                'url': url,
+                'filename': file.filename,
                 'error': str(e)
             })
     
@@ -114,7 +120,7 @@ def download_outline():
     title = secure_filename(data['title'])
     content = data['content']
     
-    filename = f"{title}.txt"
+    filename = f"{title}_outline.txt"
     with open(filename, 'w', encoding='utf-8') as f:
         f.write(content)
     

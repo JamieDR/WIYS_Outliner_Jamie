@@ -6,12 +6,6 @@ import os
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-app.config['UPLOAD_FOLDER'] = 'uploads'
-
-# Create uploads folder if it doesn't exist
-if not os.path.exists(app.config['UPLOAD_FOLDER']):
-    os.makedirs(app.config['UPLOAD_FOLDER'])
 
 # Load spacy model at startup
 try:
@@ -22,13 +16,6 @@ except:
     nlp = spacy.load("en_core_web_sm")
 
 def create_outline(text):
-    # Clean the text
-    text = re.sub(r'Advertisement|Sponsored Content|Share this article|Follow us|Subscribe|Sign up', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'(Follow|Like|Share|Tweet|Pin).+(Facebook|Twitter|Instagram|LinkedIn|Pinterest)', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'Sign up for our newsletter|Get our daily newsletter|Enter your email', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'Menu|Navigation|Home|About|Contact|Search', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'Copyright|All rights reserved|Terms of (Use|Service)|Privacy Policy', '', text, flags=re.IGNORECASE)
-    
     paragraphs = text.split('\n')
     outline = []
     
@@ -40,7 +27,9 @@ def create_outline(text):
         if not para or len(para) < 10:
             continue
             
+        # Check if this is likely a header
         if len(para.split()) <= 5 and len(para) < 50:
+            # Save previous section if it exists
             if current_section and current_points:
                 outline.append({
                     "header": current_section,
@@ -52,20 +41,17 @@ def create_outline(text):
             doc = nlp(para)
             for sent in doc.sents:
                 point = sent.text.strip()
-                point = re.sub(r'^(There are|There is|It is|This is)\s+', '', point)
                 point = point.rstrip('.')
-                
                 if len(point.split()) > 3:
                     current_points.append(point)
     
+    # Add the last section
     if current_section and current_points:
         outline.append({
             "header": current_section,
             "points": current_points
         })
     
-    # Remove any empty sections
-    outline = [section for section in outline if section['points']]
     return outline
 
 @app.route('/')
@@ -74,26 +60,21 @@ def home():
 
 @app.route('/generate-outlines', methods=['POST'])
 def generate_outlines():
-    results = []
-    
     if 'files[]' not in request.files:
         return jsonify({'error': 'No files uploaded'}), 400
         
     files = request.files.getlist('files[]')
+    results = []
     
     for file in files:
-        if file.filename == '':
+        if file.filename == '' or not file.filename.endswith('.txt'):
             continue
             
         try:
-            # Read and decode the file content
             content = file.read().decode('utf-8')
-            
-            # Create outline from file content
             outline = create_outline(content)
             
             if outline:
-                # Use filename without extension as title
                 title = os.path.splitext(file.filename)[0]
                 results.append({
                     'filename': file.filename,
